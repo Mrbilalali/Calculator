@@ -4,34 +4,109 @@ import streamlit as st
 st.set_page_config(page_title="Calculator", layout="centered")
 st.title("🧮 NAVTTC Calculator")
 
-# Initialize expression
+# Custom CSS Styling
+st.markdown("""
+    <style>
+    /* Center the calculator */
+    .stTextInput, .stButton {
+        font-size: 20px;
+    }
+
+    input[type="text"] {
+        background-color: #f0f2f6;
+        padding: 12px;
+        border: 2px solid #ccc;
+        border-radius: 10px;
+        font-weight: bold;
+        width: 100%;
+        text-align: right;
+    }
+
+    .stButton>button {
+        background-color: #2c3e50;
+        color: white;
+        font-size: 22px;
+        padding: 16px;
+        border: none;
+        border-radius: 12px;
+        transition: background-color 0.2s ease;
+    }
+
+    .stButton>button:hover {
+        background-color: #1abc9c;
+        color: black;
+        font-weight: bold;
+    }
+
+    .stButton>button:active {
+        background-color: #16a085 !important;
+        transform: scale(0.98);
+    }
+
+    .stError {
+        color: red;
+        font-weight: bold;
+        margin-top: 5px;
+    }
+
+    </style>
+""", unsafe_allow_html=True)
+
+# Initialize session state variables
 if "expression" not in st.session_state:
     st.session_state.expression = ""
+if "error_msg" not in st.session_state:
+    st.session_state.error_msg = ""
 
 # Evaluate expression safely
 def evaluate_expression(expr):
     try:
         expr = expr.replace("x", "*").replace("^", "**").replace("\u00A0", "")
         result = eval(expr)
+        st.session_state.error_msg = ""
         return str(result)
     except:
-        return "Error"
+        st.session_state.error_msg = "❌ Invalid expression. Please check your input."
+        return st.session_state.expression
 
-# Handle button click
+# Handle Enter or text field changes
+def on_enter_callback():
+    st.session_state.expression = evaluate_expression(st.session_state.expression)
+
+# Handle button clicks
 def on_click(val):
     if val in ["+\u00A0", "-\u00A0"]:
-        val = val.strip()  # remove non-breaking space
+        val = val.strip()
+
+    operators = {"+", "-", "*", "/", "^", "x"}
+
     if val == "C":
         st.session_state.expression = ""
+        st.session_state.error_msg = ""
     elif val == "=":
         st.session_state.expression = evaluate_expression(st.session_state.expression)
     else:
-        st.session_state.expression += val
+        expr = st.session_state.expression
+        if val in operators:
+            if expr:
+                if expr[-1] in operators:
+                    st.session_state.expression = expr[:-1] + val
+                else:
+                    st.session_state.expression += val
+            else:
+                if val == "-":
+                    st.session_state.expression += val
+        else:
+            st.session_state.expression += val
 
-# Display expression
-st.text_input("Expression", value=st.session_state.expression, disabled=True)
+# Text input for expression
+st.text_input("Expression", key="expression", on_change=on_enter_callback, label_visibility="collapsed")
 
-# Buttons layout
+# Show error below the input if any
+if st.session_state.error_msg:
+    st.error(st.session_state.error_msg)
+
+# Calculator buttons layout
 button_rows = [
     ["C", "(", ")", "^"],
     ["7", "8", "9", "/"],
@@ -40,15 +115,9 @@ button_rows = [
     ["0", ".", "=", "+\u00A0"]
 ]
 
-# Render buttons
+# Render the buttons
 for row in button_rows:
     cols = st.columns(4)
     for col, btn in zip(cols, row):
         with col:
             st.button(btn, use_container_width=True, on_click=on_click, args=(btn,))
-
-# Optional keyboard input
-with st.expander("⌨️ Or use keyboard input"):
-    manual = st.text_input("Enter expression")
-    if st.button("Calculate"):
-        st.success(f"Result: {evaluate_expression(manual)}")
