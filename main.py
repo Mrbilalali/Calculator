@@ -8,7 +8,7 @@ st.title("🧮 NAVTTC Calculator")
 # Custom CSS Styling
 st.markdown("""
     <style>
-    /* Center the calculator and style the text input and buttons */
+    /* Style the text input and buttons */
     .stTextInput, .stButton {
         font-size: 20px;
     }
@@ -48,17 +48,38 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Inject JavaScript with a slight delay to auto-focus the text input field.
+# Inject JavaScript to ensure permanent focus on the text input:
+# The script attaches an event listener to the text input so that if it loses focus, it re-focuses immediately.
 components.html(
     """
     <script>
-    setTimeout(function(){
-        // Using window.parent.document to access the Streamlit container
-        const inputField = window.parent.document.querySelector('input[type="text"]');
-        if (inputField) {
-            inputField.focus();
-        }
-    }, 500);
+    function focusInput() {
+      const inputField = window.parent.document.querySelector('input[type="text"]');
+      if(inputField) {
+          inputField.focus();
+      }
+    }
+    // Try to focus the input field on page load with a slight delay.
+    setTimeout(focusInput, 500);
+    
+    // Attach a "blur" event to permanently re-focus the input field.
+    document.addEventListener('DOMContentLoaded', () => {
+      const inputField = window.parent.document.querySelector('input[type="text"]');
+      if(inputField) {
+          inputField.addEventListener('blur', () => {
+              setTimeout(focusInput, 50);
+          });
+          // Ensure initial focus.
+          inputField.focus();
+      }
+    });
+    
+    // Also, when any calculator button is clicked, re-focus the text input shortly after.
+    document.addEventListener("click", function(event) {
+      if(event.target.closest(".stButton")) {
+        setTimeout(focusInput, 50);
+      }
+    });
     </script>
     """,
     height=0
@@ -73,6 +94,7 @@ if "error_msg" not in st.session_state:
 # Evaluate expression safely
 def evaluate_expression(expr):
     try:
+        # Replace visual symbols with actual Python operators
         expr = expr.replace("x", "*").replace("^", "**").replace("\u00A0", "")
         result = eval(expr)
         st.session_state.error_msg = ""
@@ -81,7 +103,7 @@ def evaluate_expression(expr):
         st.session_state.error_msg = "❌ Invalid expression. Please check your input."
         return st.session_state.expression
 
-# Handle Enter or text field changes
+# Handle Enter (or changes in the text field)
 def on_enter_callback():
     st.session_state.expression = evaluate_expression(st.session_state.expression)
 
@@ -101,22 +123,21 @@ def on_click(val):
         expr = st.session_state.expression
         if val in operators:
             if expr:
-                # Replace the last operator if there's already one
+                # Replace the last operator if one already exists.
                 if expr[-1] in operators:
                     st.session_state.expression = expr[:-1] + val
                 else:
                     st.session_state.expression += val
             else:
-                # Allow starting with a minus for negative numbers
-                if val == "-":
+                if val == "-":  # Allow starting with a minus.
                     st.session_state.expression += val
         else:
             st.session_state.expression += val
 
-# Text input for expression with on_change callback (Enter key press will trigger evaluation)
+# Single text input for expression (display and manual input) with on_change callback.
 st.text_input("Expression", key="expression", on_change=on_enter_callback, label_visibility="collapsed")
 
-# Display error message below the input if any
+# Display error message below the input, if any.
 if st.session_state.error_msg:
     st.error(st.session_state.error_msg)
 
